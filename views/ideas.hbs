@@ -1,0 +1,24 @@
+{{#each ideas}}
+<div class="card card-body mb-2">
+    <h4>{{title}}</h4>
+    <p class="lead">{{details}}</p>
+    <a class="btn btn-info mb-2" href="/edit/{{id_uuid}}">Edit</a>
+    <form action="/remove/{{id_uuid}}?_method=DELETE" method="POST">
+        <input type="hidden" name="_method" value="DELETE">
+        <input type="submit" class="btn btn-danger btn-block" onclick="delConfirm()" value="Remove">
+        <script>
+            function delConfirm() {
+                const del = confirm('Are Sure You Want To Delete This Video Idea');
+                if (confirm('Are Sure You Want To Delete This Video Idea') === true) {
+                    return true;
+                }else{
+                    window.location.href = "/ideas";
+                    return false;
+                }
+            }
+        </script>
+    </form>
+</div>
+{{else }}
+<p class="lead"> No Videos Ideas Listed </p>
+{{/each}}
