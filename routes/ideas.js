@@ -1,17 +1,20 @@
 const express = require('express');
-const jwt  = require('jsonwebtoken');
+const jwt = require('jsonwebtoken');
 const { Client } = require('pg');
+const cors = require('cors');
 const { check, validationResult } = require("express-validator");
-const { ensureAuthenticated } = require('../auth/auth');
+const { ensureAuthenticated, checkUser, checkAbout} = require('../auth/auth');
 
 const router = express.Router();
 
+
+// const dbConn = require('../dbConnection/dbConn');
 const client = new Client({
     user: 'RecipeDB',
     host: 'localhost',
     database: 'RecipeDB',
     password: '1234',
-    port: '5432'
+    port: '5432'    
 });
 
 client.connect((err, client, done) => {
@@ -23,9 +26,12 @@ client.connect((err, client, done) => {
 });
 // const dbConn = require('../dbConnection/dbConn');
 
+// require('../auth/auth').ensureAuthenticated();
+
 router.get('/', ensureAuthenticated, (req, res) => {
     res.render('index', {
-        title: 'Vidjot'
+        title: 'Vidjot',
+        // user: req.user
     });
 });
 
@@ -44,34 +50,55 @@ router.get('/', ensureAuthenticated, (req, res) => {
 // });
 
 
-router.get('/about', (req, res) => {
-    res.render('about');
+router.get('/about', checkUser,   /*async*/ (req, res) => {
+    // const checker =  req.flash('user', `${req.user}`);
+    // if(checker === true){
+    //     return res.render('about',{
+    //         // user: req.flash('user', `${req.user}`) 
+    //     });
+    // }
+    // if(checker === false){
+    //     return res.render('about',{
+    //         user: req.flash('user', `${req.user}`)
+    //     });
+    // }
+    res.render('about', {
+        // user: req.user
+    })
 });
 
 // list of ideas route
 router.get('/ideas', ensureAuthenticated, (req, res) => {
-    let sql = `select * from jot_videos where jot_users_id=${req.user.id}`;
-    // let sql_value = [req.user];
-    client.query(sql, (err, results) => {
-        if (err) throw err.stack;
-        // console.error(err);
-        // console.log(results);
-        let rows = '';
-        for (i = 0; i < results.rows.length; i++) {
-            rows = results.rows[i];
-        }
-        console.log(rows);
-        console.log(results.rows);
-        res.render('ideas', {
-            ideas: results.rows
+    let id = '';
+    if (!req.user) {
+        ensureAuthenticated;
+    }else{
+        let sql = `select * from jot_videos where jot_users_id=${req.user.id}`;
+        // let sql_value = [req.user];
+        client.query(sql, (err, results) => {
+            if (err) throw err.stack;
+            // console.error(err);
+            // console.log(results);
+            let rows = '';
+            for (i = 0; i < results.rows.length; i++) {
+                rows = results.rows[i];
+            }
+            console.log(rows);
+            console.log(results.rows);
+            res.render('ideas', {
+                ideas: results.rows,
+                user: req.user
+            });
         });
-    });
+    }
     // res.render('');
 });
 
 //add Videos ideas
 router.get('/ideas/add', ensureAuthenticated, (req, res) => {
-    res.render('add');
+    res.render('add', {
+        user: req.user
+    });
 });
 
 //Edit Videos ideas 's GET route
@@ -100,7 +127,8 @@ router.get('/edit/:id', ensureAuthenticated, (req, res) => {
         }
         console.log(row);
         res.render('edit', {
-            results: row
+            results: row,
+            user: req.user
         });
     });
 });
@@ -109,7 +137,7 @@ router.get('/edit/:id', ensureAuthenticated, (req, res) => {
 // Post ideas Routes
 
 // add ideas ' s post routes
-router.post('/ideas', ensureAuthenticated,[
+router.post('/ideas', ensureAuthenticated, [
     check('title', 'this Title must be 5+ characters')
         .exists()
         .isLength({ min: 5 }),
@@ -132,7 +160,8 @@ router.post('/ideas', ensureAuthenticated,[
         res.render('add', {
             msg: validationError,
             details,
-            title
+            title,
+            user: req.user
             // msg_2: validationError[0].msg
         })
     } else {
@@ -152,7 +181,7 @@ router.post('/ideas', ensureAuthenticated,[
 });
 
 // Edit form Process
-router.put('/edit/:id', ensureAuthenticated,(req, res) => {
+router.put('/edit/:id', ensureAuthenticated, (req, res) => {
     let sql = `UPDATE jot_videos SET title = $1, details = $2 WHERE id_uuid = $3`;
     let sql_value = [req.body.title, req.body.details, req.params.id];
     client.query(sql, sql_value, (err, results) => {
@@ -164,12 +193,12 @@ router.put('/edit/:id', ensureAuthenticated,(req, res) => {
         res.redirect('/ideas');
     });
 });
-router.delete('/remove/:id', ensureAuthenticated,(req, res) => {
+router.delete('/remove/:id', ensureAuthenticated, (req, res) => {
     let sql = 'DELETE  FROM jot_videos WHERE id_uuid = $1';
     let sql_value = [req.params.id];
     client.query(sql, sql_value, (err, results) => {
         if (err) throw err.stack;
-        console.log('Deleted Row is'+results.rows);
+        console.log('Deleted Row is' + results.rows);
         req.flash('error_msg', 'Video Ideas Removed');
         res.redirect('/ideas');
     });
